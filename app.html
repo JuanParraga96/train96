@@ -3232,7 +3232,7 @@ function quizConsentStep(){ const c=S.quiz.consent;
   const req=[['termsAccepted','Términos de uso'],['privacyAccepted','Política de privacidad'],['essentialDataAccepted','Tratamiento de datos necesario para el servicio'],['shareWithTrainerAccepted','Compartir mis respuestas con mi entrenador']];
   const opt=[['physicalDataAccepted','Almacenar información física'],['mediaAccepted','Fotografías y videos'],['marketingAccepted','Comunicaciones futuras']];
   return `<h1 class="quiz-q-title">Consentimiento</h1><p class="muted quiz-q-sub">Necesarios para continuar</p>
-    ${req.map(it=>`<label class="row spread surface" style="padding:13px;margin-bottom:8px"><span>${it[1]}</span><span class="switch"><input type="checkbox" ${c[it[0]]?'checked':''} onchange="S.quiz.consent.${it[0]}=this.checked;renderQuizBody()"><span class="slider"></span></span></label>`).join('')}
+    ${req.map(it=>`<label class="row spread surface" style="padding:13px;margin-bottom:8px"><span>${it[1]}</span><span class="switch"><input type="checkbox" ${c[it[0]]?'checked':''} onchange="S.quiz.consent.${it[0]}=this.checked;QuizService.touch()"><span class="slider"></span></span></label>`).join('')}
     <div class="quiz-q-sub" style="margin:14px 0 8px;font-weight:600;color:var(--muted)">Opcionales</div>
     ${opt.map(it=>`<label class="row spread surface" style="padding:13px;margin-bottom:8px"><span>${it[1]}</span><span class="switch"><input type="checkbox" ${c[it[0]]?'checked':''} onchange="S.quiz.consent.${it[0]}=this.checked"><span class="slider"></span></span></label>`).join('')}
     <div class="tiny muted" style="margin-top:8px">La información médica detallada se solicitará después con un consentimiento independiente.</div>${stepErr('consent')}`;
@@ -3260,6 +3260,8 @@ function quizSteps(){ return STEPS.filter(s=>!s.cond||s.cond(S.quiz)); }
 function curStep(){ if(S.quiz.stage==='processing')return{id:'__processing'}; if(S.quiz.stage==='result')return{id:'__result'}; const steps=quizSteps(); return steps.find(s=>s.id===S.quiz.currentStepId)||steps[0]; }
 function quizPct(){ const steps=quizSteps(); const qs=steps.filter(s=>s.q); const ci=steps.findIndex(s=>s.id===S.quiz.currentStepId); if(ci<0)return 0; const done=steps.slice(0,ci+1).filter(s=>s.q).length; if(!qs.length)return 0; return clamp(Math.round(done/qs.length*100), done>0?4:0, 100); }
 function quizShell(inner,showProgress,step){ const pct=showProgress?quizPct():0; const chap=step&&step.chapter?step.chapter:'';
+  // Los pasos de pregunta que NO avanzan solos (escritura, múltiple, medidas, escala, etc.) necesitan botón Continuar.
+  const needCTA = step && step.q && !step.auto;
   return `<div class="quiz-wrap">
     <div class="quiz-top">
       <button class="ibtn" onclick="quizBack()" aria-label="Atrás" ${step&&step.id==='welcome'?'style="visibility:hidden"':''}>${icon('chevL')}</button>
@@ -3267,7 +3269,9 @@ function quizShell(inner,showProgress,step){ const pct=showProgress?quizPct():0;
       <button class="ibtn" onclick="quizExit()" aria-label="Guardar y salir">${icon('x')}</button>
     </div>
     ${showProgress&&chap?`<div class="quiz-count" aria-live="polite">${esc(chap)} · ${pct}%</div>`:''}
-    <div class="quiz-body" id="quizBody">${inner}</div>
+    <div class="quiz-body" id="quizBody">${inner}
+      ${needCTA?`<button class="btn primary block quiz-cta" style="margin-top:20px" onclick="quizNext()">Continuar ${icon('chevR')}</button>`:''}
+    </div>
   </div>`;
 }
 function renderQuizBody(){ $('#app').innerHTML=viewQuiz(); }
