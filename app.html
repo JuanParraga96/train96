@@ -478,17 +478,19 @@ kbd{font-family:var(--font);background:var(--card-2);border:1px solid var(--line
 .quiz-q-title{font-size:24px;line-height:1.25;margin-bottom:6px}
 .quiz-q-sub{margin-bottom:20px}
 .quiz-q-title+.quiz-options{margin-top:18px}
-.quiz-cta{padding:15px;font-size:15px;border-radius:14px;position:sticky;bottom:10px}
+.quiz-cta{min-height:52px;padding:15px;font-size:15px;border-radius:14px;position:sticky;bottom:calc(10px + env(safe-area-inset-bottom))}
+.quiz-cta:disabled,.quiz-cta[aria-disabled="true"]{opacity:.45;cursor:not-allowed}
 .quiz-input{padding:14px;font-size:16px;border-radius:14px}
 .quiz-options{display:flex;flex-direction:column;gap:10px}
-.quiz-opt{display:flex;align-items:center;gap:13px;padding:14px;min-height:56px;border-radius:15px;background:var(--bg-2);border:1.5px solid var(--line-strong);text-align:left;transition:.18s var(--ease);width:100%}
+.quiz-opt{display:flex;align-items:center;gap:13px;padding:14px;min-height:64px;border-radius:15px;background:var(--bg-2);border:1.5px solid var(--line-strong);text-align:left;transition:.18s var(--ease);width:100%}
 .quiz-opt:hover{border-color:var(--line);background:var(--card-2)}
+.quiz-opt:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 .quiz-opt.sel{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 14%,var(--bg-2))}
-.quiz-opt .qo-ico{width:40px;height:40px;border-radius:11px;background:var(--card-2);color:var(--brand);display:flex;align-items:center;justify-content:center;flex:none;transition:.2s}
+.quiz-opt .qo-ico{width:40px;height:40px;border-radius:11px;background:var(--card-2);color:var(--muted);display:flex;align-items:center;justify-content:center;flex:none;transition:.2s}
 .quiz-opt.sel .qo-ico{background:var(--brand-grad);color:#fff}
-.quiz-opt .qo-txt{flex:1;min-width:0}
-.quiz-opt .qo-title{font-weight:700;font-size:15px}
-.quiz-opt .qo-sub{font-size:12.5px;color:var(--muted);margin-top:1px}
+.quiz-opt .qo-txt{display:flex;flex-direction:column;align-items:flex-start;gap:4px;flex:1;min-width:0}
+.quiz-opt .qo-title{display:block;width:100%;font-size:15.5px;font-weight:700;line-height:1.25}
+.quiz-opt .qo-sub{display:block;width:100%;margin-top:0;font-size:12.5px;line-height:1.4;color:var(--muted)}
 .quiz-opt .qo-check{width:24px;height:24px;border-radius:50%;background:var(--brand-grad);color:#fff;display:flex;align-items:center;justify-content:center;flex:none}
 .quiz-opt .qo-check svg{width:14px;height:14px}
 /* stepper */
@@ -508,15 +510,13 @@ kbd{font-family:var(--font);background:var(--card-2);border:1px solid var(--line
 .scale-item.sel{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 14%,var(--bg-2))}
 .scale-item .scale-num{width:34px;height:34px;border-radius:10px;background:var(--card-2);display:flex;align-items:center;justify-content:center;font-weight:800;flex:none}
 .scale-item.sel .scale-num{background:var(--brand-grad);color:#fff}
-/* painmap */
-.painmap-wrap{display:flex;gap:18px;align-items:center;flex-wrap:wrap;justify-content:center}
-.painmap{width:130px;flex:none}
-.painzone{fill:#37436b;stroke:#0b0f1c;stroke-width:1.5;cursor:pointer;transition:.2s}
-.painzone:hover{fill:#4a5891}
-.painzone.on{fill:var(--warn);filter:drop-shadow(0 0 5px var(--warn))}
-.painchips{display:flex;flex-wrap:wrap;gap:8px;flex:1;min-width:200px}
-.painchips .chip{padding:9px 13px;min-height:40px}
+/* processing (centrado perfecto) */
+.quiz-processing{width:100%;min-height:calc(100dvh - 48px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px 16px}
+.quiz-processing .proc-ring{width:120px;height:120px;margin:0 auto 20px;display:flex;align-items:center;justify-content:center;animation:pulse 1.6s infinite}
+.quiz-processing .proc-ring svg{display:block;margin:0 auto}
 .proc-ring{animation:pulse 1.6s infinite}
+/* comentario de limitación */
+.limit-box{margin-top:14px;animation:slideUp .25s var(--ease)}
 @media(max-width:520px){ .quiz-wrap{padding:12px 14px 26px} .quiz-q-title{font-size:21px} .measure-val{font-size:38px} .stepper-val{font-size:44px} }
 @media (prefers-reduced-motion: reduce){ *{animation-duration:.01ms !important;transition-duration:.01ms !important} }
 </style>
@@ -856,7 +856,21 @@ function migrateDatabase(oldDb){
     if(!('height'in s)) s.height=null; if(!('measures'in s)) s.measures=s.measures||null;
     // No inventar datos físicos: dejar tal cual. Separar email/phone si venían juntos (no forzamos).
     if(!('birthDate'in s)) s.birthDate=s.birth||'';
+    // Renombre secundarios y molestias
+    if(!Array.isArray(s.goalsSec)&&Array.isArray(s.desiredChange)) s.goalsSec=s.desiredChange;
+    if(s.hasLimitation==null){ if(s.painType!==undefined) s.hasLimitation=s.painType&&s.painType!=='No'; else if(s.pain) s.hasLimitation=true; else s.hasLimitation=false; }
+    if(!s.limitationComment) s.limitationComment=s.painComment||s.pain||'';
     delete s.reviewStatus;
+    // Migrar respuestas del quiz guardadas en el alumno
+    if(s.quizAnswers){ const qa=s.quizAnswers; if(Array.isArray(qa.desiredChange)&&!Array.isArray(qa.secondaryGoals))qa.secondaryGoals=qa.desiredChange;
+      if(qa.painComment&&!qa.limitationComment)qa.limitationComment=qa.painComment;
+      if(qa.painType&&qa.hasLimitation==null)qa.hasLimitation=qa.painType!=='No'?'Sí':'No'; }
+  });
+  // Migrar sesiones de quiz en progreso
+  (db.quizSessions||[]).forEach(q=>{ const a=q.answers; if(!a)return;
+    if(Array.isArray(a.desiredChange)&&!Array.isArray(a.secondaryGoals))a.secondaryGoals=a.desiredChange;
+    if(a.painComment&&!a.limitationComment)a.limitationComment=a.painComment;
+    if(a.painType&&a.hasLimitation==null)a.hasLimitation=a.painType!=='No'?'Sí':'No';
   });
   (db.assistants||[]).forEach(a=>{ a.perms=a.perms||{}; PERMS_ALL.forEach(k=>{ if(!(k in a.perms)) a.perms[k]=!!(a.perms[LEGACY_PERM[k]]); }); });
   db.meta.schemaVersion=3; db.meta.version='1.2-demo';
@@ -2347,7 +2361,7 @@ function viewStudentPending(s){
   <div class="card pad">
     <h3 style="margin-bottom:12px">Tu punto de partida</h3>
     ${kv('Objetivo',esc(s.goal||'—'))}${kv('Nivel',esc(s.experience||'—'))}${kv('Disponibilidad',(s.days||[]).join(', ')+(s.sessionsPerWeek?' · '+s.sessionsPerWeek+' sesiones':''))}${kv('Lugar',esc(s.gymPlace||'—'))}
-    ${s.pain?kv('Zonas de atención',esc(s.pain)):''}
+    ${s.hasLimitation?kv('Molestia o limitación',esc(s.limitationComment||s.pain||'Reportada')):''}
     <button class="btn ghost block" style="margin-top:14px" onclick="go('s-profile')">${icon('user')} Ver mi perfil</button>
   </div>`;
 }
@@ -2754,15 +2768,15 @@ const StudentService={
       status:'active', profileStatus:'pending-review', accountStatus:'limited', source:'quiz', intent: explorando?'exploring':'ready',
       unit:p.weightUnit||'kg', weight:p.weight, targetWeight:p.targetWeight!=null?p.targetWeight:null, experience:p.experience||'Principiante',
       lastActivity:new Date().toISOString(), submittedAt:new Date().toISOString(), nextSession:null,
-      alert: (p.painZones&&p.painZones.length)?'pain':null,
+      alert: p.hasLimitation?'pain':null,
       email:(p.email||inv.email||'').toLowerCase(), phone:p.phone||'', phoneCountryCode:p.phoneCountryCode||'', phoneNumber:p.phoneNumber||'',
       birthDate:p.birthDate||'', country:'', height:p.height, heightUnit:p.heightUnit||'cm', weightUnit:p.weightUnit||'kg', dominance:'',
       days:p.days||[], sessionsPerWeek:p.sessions||null, gymPlace:(p.places&&p.places[0])||'', equipment:p.equipment||[], timeAvail:p.duration||'',
-      injuries:'', pain:(p.painZones||[]).join(', '), painIntensity:p.painIntensity||'', painComment:p.painComment||'', conditions:'', meds:'', avoid:'',
+      injuries:'', hasLimitation:!!p.hasLimitation, limitationComment:p.limitationComment||'', pain:p.limitationComment||'', conditions:'', meds:'', avoid:'',
       prefs:{favoritos:'',odiados:'',lugar:(p.places&&p.places[0])||'',maquinas:'',pesas:'',intensidad:'',coaching:p.coaching||''},
       progress:[], measures:null,
       privacy:{peso:true,medidas:true,fotos:false,medico:false,lesiones:true,videos:true,contacto:false},
-      consent:{ ...sess.consent }, onboarded:true, quizAnswers:sess.answers, quizIdentity:sess.identity,
+      consent:{status:'not-collected-in-demo'}, onboarded:true, quizAnswers:sess.answers, quizIdentity:sess.identity,
       profileType:p.profileType||'', avatarColor:['#4361ff','#8b5cf6','#0891b2','#e11d8f','#16a34a','#f97316'][DB.students.length%6] };
     if(inv.requireApproval===false){ s.profileStatus='approved'; s.accountStatus='active'; }
     DB.students.push(s); const t=DB.trainers.find(x=>x.id===inv.trainer); if(t&&!t.students.includes(s.id))t.students.push(s.id);
@@ -2859,7 +2873,10 @@ function openDevMenu(){
 }
 function logout(){ S.authed=false; saveState(); location.href='index.html'; }
 /* Registro demo aislado: invitación marcada como demo bajo el primer entrenador */
-function startDemoRegistration(){ const t=DB.trainers[0]; const inv=InvitationService.create({trainer:t.id,name:'',method:'link',demo:true,requireApproval:true}); openAsInvited(inv.token); }
+/* Registro demo NUEVO: siempre invitación y sesión limpias (no reutiliza respuestas ni tokens previos) */
+function startNewDemoRegistration(){ const t=DB.trainers[0]; const inv=InvitationService.create({trainer:t.id,name:'',method:'link',demo:true,requireApproval:true}); S.invitedView=null; openAsInvited(inv.token); }
+/* Reanudar una invitación existente (real): restaura sus respuestas si estaba en progreso */
+function resumeExistingInvitation(token){ openAsInvited(token); }
 
 /* =========================================================================
    PERMISOS DEL ASISTENTE
@@ -3032,7 +3049,8 @@ function openReview(id){
     ${kv('Altura',physLabel(s.height,s.heightUnit))}${kv('Peso',physLabel(s.weight,s.weightUnit))}
     <h3 style="margin:14px 0 8px">Respuestas del cuestionario</h3>
     ${rows||'<div class="tiny muted">Sin respuestas registradas.</div>'}
-    ${s.pain?`<div class="legal-note" style="margin-top:12px">${icon('alert')}<div><b>Zonas de atención:</b> ${esc(s.pain)}${s.painIntensity?' · '+esc(s.painIntensity):''}${s.painComment?'<br>'+esc(s.painComment):''}</div></div>`:''}
+    <h3 style="margin:14px 0 8px">Molestia o limitación</h3>
+    ${s.hasLimitation?`<div class="legal-note">${icon('alert')}<div><b>Tiene una limitación reportada</b><br>${esc(s.limitationComment||s.pain||'')}</div></div>`:kv('Molestias o limitaciones','No reportadas')}
   </div>
   <div class="modal-foot">
     <button class="btn ghost" onclick="closeModal();openStudent('${s.id}')">${icon('user')} Ver ficha</button>
@@ -3048,8 +3066,7 @@ function requestInfo(id){ StudentService.requestInfo(id); closeModal(); toast('S
 ========================================================================== */
 const QUIZ_DOC_VERSION='v1.0-demo';
 const COUNTRY_CODES=['+57','+52','+54','+56','+51','+593','+34','+1'];
-const PAIN_ZONES=['Cuello','Hombros','Espalda alta','Zona lumbar','Codos','Muñecas','Cadera','Rodillas','Tobillos'];
-const QUIZ_LABELS={primaryGoal:'Objetivo principal',desiredChange:'Qué quiere sentir',experienceLevel:'Nivel',currentWeeklyFrequency:'Frecuencia actual',availableDays:'Días disponibles',desiredSessions:'Sesiones deseadas',sessionDuration:'Duración',preferredTime:'Momento del día',primaryLocation:'Lugar',equipment:'Equipo',height:'Altura',weight:'Peso',weightGoalDirection:'Dirección de peso',targetWeight:'Peso objetivo',hasPain:'Molestias',painZones:'Zonas de atención',painIntensity:'Intensidad',painComment:'Comentario',mainObstacle:'Obstáculo principal',coachingStyle:'Acompañamiento',startTiming:'Inicio',desiredStartDate:'Fecha deseada'};
+const QUIZ_LABELS={primaryGoal:'Objetivo principal',secondaryGoals:'Objetivos secundarios',experienceLevel:'Situación actual',availableDays:'Días disponibles',desiredSessions:'Sesiones deseadas',sessionDuration:'Duración',preferredTime:'Momento del día',primaryLocation:'Lugar',equipment:'Equipo',weightGoalDirection:'Dirección de peso',targetWeight:'Peso objetivo',mainObstacle:'Obstáculo principal',coachingStyle:'Acompañamiento',startTiming:'Inicio',desiredStartDate:'Fecha deseada'};
 const DAYS_MAP_SHORT={Lunes:'Lun',Martes:'Mar',Miércoles:'Mié',Jueves:'Jue',Viernes:'Vie',Sábado:'Sáb',Domingo:'Dom'};
 
 /* ---- Helpers de valor/edad ---- */
@@ -3060,12 +3077,12 @@ function cmToFt(cm){ const t=cm/2.54; const f=Math.floor(t/12); const i=Math.rou
 function escq(s){ return String(s).replace(/'/g,"\\'"); }
 
 /* ---- Definición de pasos (narrativa por capítulos) ---- */
-function optSingle(key,opts,auto){ const a=A()[key];
-  return `<div class="quiz-options">${opts.map(o=>`<button class="quiz-opt ${a===o[0]?'sel':''}" onclick="quizPick('${key}','${escq(o[0])}',${auto?'true':'false'})" aria-pressed="${a===o[0]}">
+function optSingle(key,opts){ const a=A()[key];
+  return `<div class="quiz-options">${opts.map(o=>`<button type="button" class="quiz-opt ${a===o[0]?'sel':''}" onclick="quizPick('${key}','${escq(o[0])}')" aria-pressed="${a===o[0]}">
     <span class="qo-ico">${icon(o[1])}</span><span class="qo-txt"><span class="qo-title">${esc(o[0])}</span>${o[2]?`<span class="qo-sub">${esc(o[2])}</span>`:''}</span>${a===o[0]?`<span class="qo-check">${icon('check')}</span>`:''}</button>`).join('')}</div>`; }
-function optMulti(key,opts,max){ const arr=A()[key]||[];
-  return `<div class="quiz-options">${opts.map(o=>{const on=arr.includes(o[0]);return `<button class="quiz-opt ${on?'sel':''}" onclick="quizPickMulti('${key}','${escq(o[0])}',${max})" aria-pressed="${on}">
-    <span class="qo-ico">${icon(o[1])}</span><span class="qo-txt"><span class="qo-title">${esc(o[0])}</span></span><span class="qo-check">${on?icon('check'):''}</span></button>`;}).join('')}</div>${max?`<div class="tiny muted" style="text-align:center;margin-top:10px">Máximo ${max}</div>`:''}`; }
+function optMulti(key,opts,max){ const arr=A()[key]||[]; const full=arr.length>=max;
+  return `<div class="quiz-options">${opts.map(o=>{const on=arr.includes(o[0]);return `<button type="button" class="quiz-opt ${on?'sel':''}" onclick="quizPickMulti('${key}','${escq(o[0])}',${max})" aria-pressed="${on}">
+    <span class="qo-ico">${icon(o[1])}</span><span class="qo-txt"><span class="qo-title">${esc(o[0])}</span></span><span class="qo-check">${on?icon('check'):''}</span></button>`;}).join('')}</div>${max?`<div class="tiny muted" style="text-align:center;margin-top:10px">${full?'Puedes elegir hasta '+max+'. Deselecciona una para cambiar.':'Elige hasta '+max}</div>`:''}`; }
 
 const STEPS=[
   {id:'welcome',render:()=>quizWelcome()},
@@ -3084,7 +3101,6 @@ const STEPS=[
     <p class="muted quiz-q-sub">Esto nos ayuda a entender mejor tu punto de partida.</p>
     <label class="field" style="max-width:260px"><input id="q_birth" type="date" class="quiz-input" value="${esc(ID().birthDate)}" max="${new Date().toISOString().slice(0,10)}" oninput="quizSetBirth(this.value)"></label>
     ${age!=null?`<div class="chip" style="margin-top:14px">${age} años</div>`:''}
-    ${S.quiz.consent.guardianRequired?`<div class="legal-note" style="margin-top:14px">${icon('alert')}<div>Eres menor de 18: la activación comercial requeriría el consentimiento de un responsable. Puedes continuar en el prototipo.</div></div>`:''}
     ${stepErr('birth')}`; },
     validate:s=>{ if(!s.identity.birthDate)return{ok:false,msg:'Selecciona tu fecha de nacimiento.',focus:'#q_birth'}; const a=ageFrom(s.identity.birthDate); if(a==null||a<5||a>100)return{ok:false,msg:'Revisa la fecha ingresada.',focus:'#q_birth'}; return{ok:true}; }},
   {id:'email',chapter:'Primero, conozcámonos',q:true,render:()=>`
@@ -3104,16 +3120,16 @@ const STEPS=[
       if(req&&n.length<6)return{ok:false,msg:'Ingresa un número válido.',focus:'#q_phone'}; return{ok:true}; }},
   {id:'story1',story:true,chapter:'Primero, conozcámonos',render:()=>quizStory('Perfecto, '+(esc(ID().firstName)||'')+'.','Esto no se trata de encajarte en una rutina genérica. Vamos a construir un punto de partida alrededor de ti.')},
   // Capítulo 2 — meta
-  {id:'goal',chapter:'Ahora hablemos de tu meta',q:true,auto:true,render:()=>`
+  {id:'goal',chapter:'Ahora hablemos de tu meta',q:true,render:()=>`
     <h1 class="quiz-q-title">¿Cuál es tu objetivo principal?</h1>
-    ${optSingle('primaryGoal',[['Ganar masa muscular','dumbbell','Construir músculo de forma progresiva'],['Perder grasa','flame','Reducir grasa y definir'],['Aumentar fuerza','zap','Levantar más y ser más fuerte'],['Mejorar resistencia','activity','Aguantar más, cansarte menos'],['Mejorar movilidad','refresh','Moverte mejor y sin molestias'],['Rendimiento deportivo','target','Rendir en tu deporte'],['Volver a entrenar','play','Retomar con orden'],['Mantenerme activo','heart','Sostener tu buen estado']],true)}`,
+    ${optSingle('primaryGoal',[['Ganar masa muscular','dumbbell','Desarrollar músculo con una progresión adaptada a ti.'],['Perder grasa','flame','Reducir grasa mientras mejoras tu condición física.'],['Aumentar fuerza','zap','Mejorar tu capacidad para mover cargas con control.'],['Mejorar resistencia','activity','Mantener el esfuerzo durante más tiempo y recuperarte mejor.'],['Mejorar movilidad','refresh','Moverte con mayor libertad, control y comodidad.'],['Rendimiento deportivo','target','Prepararte mejor para las exigencias de tu deporte.'],['Volver a entrenar','play','Retomar la actividad de manera progresiva y organizada.'],['Mantenerme activo','heart','Conservar una rutina que te ayude a sentirte bien.']])}`,
     validate:s=>s.answers.primaryGoal?{ok:true}:{ok:false,msg:'Elige un objetivo.'}},
-  {id:'desiredChange',chapter:'Ahora hablemos de tu meta',q:true,render:()=>`
-    <h1 class="quiz-q-title">¿Qué te gustaría sentir que cambió?</h1>
+  {id:'secondaryGoals',chapter:'Ahora hablemos de tu meta',q:true,render:()=>`
+    <h1 class="quiz-q-title">¿Cuáles son tus objetivos secundarios?</h1>
     <p class="muted quiz-q-sub">Elige hasta dos</p>
-    ${optMulti('desiredChange',[['Tener más energía','flame'],['Sentirme más fuerte','zap'],['Mejorar mi apariencia','user'],['Moverme con más facilidad','refresh'],['Crear constancia','calendar'],['Sentirme más seguro','shield'],['Mejorar mi desempeño','trend'],['Prepararme para un reto','target']],2)}
-    ${(A().desiredChange||[]).includes('Prepararme para un reto')?`<label class="field" style="margin-top:12px">Tipo de reto (opcional)<input class="quiz-input" value="${esc(A().challengeType||'')}" oninput="A().challengeType=this.value" placeholder="Ej. carrera 10k"></label>`:''}`,
-    validate:s=>(s.answers.desiredChange&&s.answers.desiredChange.length)?{ok:true}:{ok:false,msg:'Selecciona al menos una opción.'}},
+    ${optMulti('secondaryGoals',[['Tener más energía','flame'],['Sentirme más fuerte','zap'],['Mejorar mi apariencia','user'],['Moverme con más facilidad','refresh'],['Crear constancia','calendar'],['Sentirme más seguro','shield'],['Mejorar mi desempeño','trend'],['Prepararme para un reto','target']],2)}
+    ${(A().secondaryGoals||[]).includes('Prepararme para un reto')?`<label class="field" style="margin-top:12px">Tipo de reto (opcional)<input class="quiz-input" value="${esc(A().challengeType||'')}" oninput="A().challengeType=this.value" placeholder="Ej. carrera 10k"></label>`:''}`,
+    validate:s=>(s.answers.secondaryGoals&&s.answers.secondaryGoals.length)?{ok:true}:{ok:false,msg:'Selecciona al menos una opción.'}},
   {id:'story2',story:true,chapter:'Ahora hablemos de tu meta',render:()=>quizStory('Ya sabemos hacia dónde quieres ir.','Ahora hagamos que ese objetivo encaje en tu vida real.')},
   // Capítulo 3 — hagámoslo posible
   {id:'experience',chapter:'Hagámoslo posible',q:true,render:()=>`
@@ -3136,9 +3152,9 @@ const STEPS=[
     <div class="quiz-q-sub" style="margin:18px 0 8px;font-weight:600;color:var(--muted)">Normalmente me funciona mejor…</div>
     <div class="row gap-6 wrap">${['Mañana','Mediodía','Tarde','Noche','Depende del día'].map(t=>`<button class="chip ${A().preferredTime===t?'active':''}" onclick="A().preferredTime='${t}';renderQuizBody()">${t}</button>`).join('')}</div>`,
     validate:s=>s.answers.sessionDuration?{ok:true}:{ok:false,msg:'Elige una duración.'}},
-  {id:'location',chapter:'Tu disponibilidad',q:true,auto:true,render:()=>`
+  {id:'location',chapter:'Tu disponibilidad',q:true,render:()=>`
     <h1 class="quiz-q-title">¿Dónde entrenarás la mayoría del tiempo?</h1>
-    ${optSingle('primaryLocation',[['Gimnasio','building'],['Casa','home'],['Exterior','activity'],['Distintos lugares','layers']],true)}`,
+    ${optSingle('primaryLocation',[['Gimnasio','building'],['Casa','home'],['Exterior','activity'],['Distintos lugares','layers']])}`,
     validate:s=>s.answers.primaryLocation?{ok:true}:{ok:false,msg:'Elige un lugar.'}},
   {id:'equipment',chapter:'Tu disponibilidad',q:true,cond:s=>!!s.answers.primaryLocation,render:()=>{ const gym=A().primaryLocation==='Gimnasio';
     const opts=gym?[['Gimnasio completo','building'],['Gimnasio básico','dumbbell'],['No estoy seguro','info']]
@@ -3157,22 +3173,19 @@ const STEPS=[
     validate:s=>s.answers.weightGoalDirection?{ok:true}:{ok:false,msg:'Elige una opción.'}},
   {id:'pain',chapter:'Entrenemos con criterio',q:true,render:()=>`
     <h1 class="quiz-q-title">¿Hay alguna molestia o limitación que tu entrenador deba conocer?</h1>
-    ${optSingle('painType',[['No','check'],['Sí, una molestia actual','alert'],['Sí, una lesión anterior','clock'],['Sí, una lesión reciente','alert'],['Tengo una recomendación médica','clipboard'],['Prefiero explicarlo directamente','message']],false)}
+    ${optSingle('hasLimitation',[['No','check'],['Sí','alert']])}
+    ${A().hasLimitation==='Sí'?`<div class="limit-box"><label class="field">Cuéntanos brevemente<textarea id="q_limit" oninput="A().limitationComment=this.value" placeholder="Ej. Tengo una molestia en la rodilla derecha cuando hago sentadillas.">${esc(A().limitationComment||'')}</textarea></label>
+      <div class="tiny muted" style="margin-top:6px">Describe lo que consideres importante para que tu entrenador lo tenga en cuenta.</div>${stepErr('pain')}</div>`:''}
     <div class="priv-note" style="margin-top:16px">${icon('info')}<div>Train96 no realiza diagnósticos ni sustituye la orientación de un profesional de salud.</div></div>`,
-    validate:s=>{ if(!s.answers.painType)return{ok:false,msg:'Elige una opción.'}; s.answers.hasPain=s.answers.painType!=='No'; if(!s.answers.hasPain){s.answers.painZones=[];s.answers.painIntensity='';} return{ok:true}; }},
-  {id:'painDetail',chapter:'Entrenemos con criterio',q:true,cond:s=>s.answers.hasPain===true,render:()=>{ const sel=A().painZones||[]; return `
-    <h1 class="quiz-q-title">¿Dónde y con qué intensidad?</h1>
-    ${painBody(sel)}
-    <div class="quiz-q-sub" style="margin:16px 0 8px;font-weight:600;color:var(--muted)">Intensidad</div>
-    <div class="row gap-6 wrap">${['Leve','Moderada','Alta'].map(i=>`<button class="chip ${A().painIntensity===i?'active':''}" onclick="A().painIntensity='${i}';renderQuizBody()">${i}</button>`).join('')}</div>
-    <label class="field" style="margin-top:14px">Comentario (opcional)<textarea oninput="A().painComment=this.value" placeholder="Cuéntale a tu entrenador">${esc(A().painComment||'')}</textarea></label>`; },
-    validate:s=>(s.answers.painZones&&s.answers.painZones.length)?{ok:true}:{ok:false,msg:'Toca al menos una zona.'}},
+    validate:s=>{ if(!s.answers.hasLimitation)return{ok:false,msg:'Elige una opción.'};
+      if(s.answers.hasLimitation==='Sí'&&(s.answers.limitationComment||'').trim().length<3)return{ok:false,msg:'Cuéntanos brevemente qué debemos tener en cuenta.',focus:'#q_limit'};
+      if(s.answers.hasLimitation==='No')s.answers.limitationComment=''; return{ok:true}; }},
   // Capítulo 5 — así avanzaremos
-  {id:'obstacle',chapter:'Así avanzaremos',q:true,auto:true,render:()=>`
+  {id:'obstacle',chapter:'Así avanzaremos',q:true,render:()=>`
     <h1 class="quiz-q-title">¿Qué suele dificultarte mantener el proceso?</h1>
     ${optSingle('mainObstacle',[['Falta de tiempo','clock'],['Falta de constancia','calendar'],['No saber qué hacer','info'],['Falta de motivación','flame'],['Molestias físicas','alert'],['No ver progreso','trendDown'],['Cambios de horario','refresh'],['Nada en particular','check']],true)}`,
     validate:s=>s.answers.mainObstacle?{ok:true}:{ok:false,msg:'Elige una opción.'}},
-  {id:'coaching',chapter:'Así avanzaremos',q:true,auto:true,render:()=>`
+  {id:'coaching',chapter:'Así avanzaremos',q:true,render:()=>`
     <h1 class="quiz-q-title">¿Cómo te gustaría que te acompañaran?</h1>
     ${optSingle('coachingStyle',[['Con una estructura clara','list'],['Con flexibilidad','refresh'],['Con retos frecuentes','flame'],['Avanzando gradualmente','trend'],['Con explicaciones detalladas','info'],['Con instrucciones simples','check']],true)}
     <div class="tiny muted" style="text-align:center;margin-top:12px">Podrás cambiar esto después.</div>`,
@@ -3182,10 +3195,7 @@ const STEPS=[
     ${optSingle('startTiming',[['Hoy','play'],['Esta semana','calendar'],['La próxima semana','calendar'],['En una fecha específica','clock'],['Todavía estoy explorando','eye']],false)}
     ${A().startTiming==='En una fecha específica'?`<label class="field" style="margin-top:14px;max-width:260px">Fecha<input type="date" class="quiz-input" min="${new Date().toISOString().slice(0,10)}" value="${esc(A().desiredStartDate||'')}" oninput="A().desiredStartDate=this.value"></label>`:''}`,
     validate:s=>s.answers.startTiming?{ok:true}:{ok:false,msg:'Elige una opción.'}},
-  {id:'story4',story:true,chapter:'Casi listo',render:()=>quizStory('Ya tenemos lo esencial:','tu meta, tu tiempo y lo que debemos cuidar.')},
-  // Consentimiento
-  {id:'consent',chapter:'Consentimiento',q:true,render:()=>quizConsentStep(),
-    validate:s=>{ const c=s.consent; return (c.termsAccepted&&c.privacyAccepted&&c.essentialDataAccepted&&c.shareWithTrainerAccepted)?{ok:true}:{ok:false,msg:'Acepta los consentimientos obligatorios para continuar.'}; }},
+  {id:'story4',story:true,chapter:'Casi listo',render:()=>quizStory('Ya tenemos lo esencial:','tu meta, tu disponibilidad y lo que tu entrenador debe tener en cuenta.')},
 ];
 
 /* ---- Render de pantallas especiales ---- */
@@ -3228,24 +3238,6 @@ function quizPhysical(){ const a=A(); const hu=a.heightUnit||'cm', wu=a.weightUn
   </div>
   <button class="btn ghost block" onclick="quizSkipPhysical()">Prefiero completarlo después</button>`;
 }
-function quizConsentStep(){ const c=S.quiz.consent;
-  const req=[['termsAccepted','Términos de uso'],['privacyAccepted','Política de privacidad'],['essentialDataAccepted','Tratamiento de datos necesario para el servicio'],['shareWithTrainerAccepted','Compartir mis respuestas con mi entrenador']];
-  const opt=[['physicalDataAccepted','Almacenar información física'],['mediaAccepted','Fotografías y videos'],['marketingAccepted','Comunicaciones futuras']];
-  return `<h1 class="quiz-q-title">Consentimiento</h1><p class="muted quiz-q-sub">Necesarios para continuar</p>
-    ${req.map(it=>`<label class="row spread surface" style="padding:13px;margin-bottom:8px"><span>${it[1]}</span><span class="switch"><input type="checkbox" ${c[it[0]]?'checked':''} onchange="S.quiz.consent.${it[0]}=this.checked;QuizService.touch()"><span class="slider"></span></span></label>`).join('')}
-    <div class="quiz-q-sub" style="margin:14px 0 8px;font-weight:600;color:var(--muted)">Opcionales</div>
-    ${opt.map(it=>`<label class="row spread surface" style="padding:13px;margin-bottom:8px"><span>${it[1]}</span><span class="switch"><input type="checkbox" ${c[it[0]]?'checked':''} onchange="S.quiz.consent.${it[0]}=this.checked"><span class="slider"></span></span></label>`).join('')}
-    <div class="tiny muted" style="margin-top:8px">La información médica detallada se solicitará después con un consentimiento independiente.</div>${stepErr('consent')}`;
-}
-function painBody(sel){
-  const zones=[['Cuello',80,42],['Hombros',54,74],['Hombros',106,74],['Espalda alta',80,88],['Zona lumbar',80,138],['Codos',40,116],['Codos',120,116],['Muñecas',33,158],['Muñecas',127,158],['Cadera',80,164],['Rodillas',66,232],['Rodillas',94,232],['Tobillos',66,300],['Tobillos',94,300]];
-  const outline=`<path d="M80 30 Q95 30 95 46 Q95 58 88 62 Q104 66 110 74 Q120 82 122 100 L130 150 Q132 168 126 172 L120 150 L116 120 Q118 160 116 200 Q112 240 104 300 Q100 320 92 320 Q88 300 88 260 L84 210 L80 210 L76 210 L72 260 Q72 300 68 320 Q60 320 56 300 Q48 240 44 200 Q42 160 44 120 L40 150 L34 172 Q28 168 30 150 L38 100 Q40 82 50 74 Q56 66 72 62 Q65 58 65 46 Q65 30 80 30Z" fill="#171f38" stroke="rgba(255,255,255,.1)"/><circle cx="80" cy="20" r="12" fill="#171f38" stroke="rgba(255,255,255,.1)"/>`;
-  return `<div class="painmap-wrap">
-    <svg viewBox="0 0 160 330" class="painmap" aria-hidden="true">${outline}
-    ${zones.map(z=>`<circle cx="${z[1]}" cy="${z[2]}" r="9" class="painzone ${sel.includes(z[0])?'on':''}" onclick="quizPain('${z[0]}')"><title>${z[0]}</title></circle>`).join('')}</svg>
-    <div class="painchips">${PAIN_ZONES.map(z=>`<button class="chip ${sel.includes(z)?'active':''}" onclick="quizPain('${z}')">${z}</button>`).join('')}</div>
-  </div>`;
-}
 function stepErr(id){ const e=S.quiz._error; return (e&&e.stepId===id)?`<div class="err-msg" role="alert" style="margin-top:10px">${esc(e.msg)}</div>`:''; }
 
 /* ---- Shell y navegación ---- */
@@ -3260,8 +3252,9 @@ function quizSteps(){ return STEPS.filter(s=>!s.cond||s.cond(S.quiz)); }
 function curStep(){ if(S.quiz.stage==='processing')return{id:'__processing'}; if(S.quiz.stage==='result')return{id:'__result'}; const steps=quizSteps(); return steps.find(s=>s.id===S.quiz.currentStepId)||steps[0]; }
 function quizPct(){ const steps=quizSteps(); const qs=steps.filter(s=>s.q); const ci=steps.findIndex(s=>s.id===S.quiz.currentStepId); if(ci<0)return 0; const done=steps.slice(0,ci+1).filter(s=>s.q).length; if(!qs.length)return 0; return clamp(Math.round(done/qs.length*100), done>0?4:0, 100); }
 function quizShell(inner,showProgress,step){ const pct=showProgress?quizPct():0; const chap=step&&step.chapter?step.chapter:'';
-  // Los pasos de pregunta que NO avanzan solos (escritura, múltiple, medidas, escala, etc.) necesitan botón Continuar.
-  const needCTA = step && step.q && !step.auto;
+  // Toda pregunta principal lleva botón Continuar; nunca se avanza automáticamente.
+  const needCTA = step && step.q;
+  const ready = needCTA ? stepReady(step) : true;
   return `<div class="quiz-wrap">
     <div class="quiz-top">
       <button class="ibtn" onclick="quizBack()" aria-label="Atrás" ${step&&step.id==='welcome'?'style="visibility:hidden"':''}>${icon('chevL')}</button>
@@ -3270,25 +3263,40 @@ function quizShell(inner,showProgress,step){ const pct=showProgress?quizPct():0;
     </div>
     ${showProgress&&chap?`<div class="quiz-count" aria-live="polite">${esc(chap)} · ${pct}%</div>`:''}
     <div class="quiz-body" id="quizBody">${inner}
-      ${needCTA?`<button class="btn primary block quiz-cta" style="margin-top:20px" onclick="quizNext()">Continuar ${icon('chevR')}</button>`:''}
+      ${needCTA?`<button class="btn primary block quiz-cta" style="margin-top:20px" ${ready?'':'disabled aria-disabled="true"'} onclick="quizNext()">Continuar ${icon('chevR')}</button>`:''}
     </div>
   </div>`;
 }
+/* Determina si una pregunta de selección tiene respuesta suficiente para habilitar Continuar (sin efectos secundarios) */
+function stepReady(step){ const a=A();
+  switch(step.id){
+    case 'goal': return !!a.primaryGoal;
+    case 'secondaryGoals': return (a.secondaryGoals||[]).length>0;
+    case 'experience': return !!a.experienceLevel;
+    case 'availability': return (a.availableDays||[]).length>0;
+    case 'duration': return !!a.sessionDuration;
+    case 'location': return !!a.primaryLocation;
+    case 'equipment': return a.primaryLocation==='Gimnasio'?!!a.equipment_single:(a.equipment||[]).length>0;
+    case 'weightgoal': return !!a.weightGoalDirection;
+    case 'obstacle': return !!a.mainObstacle;
+    case 'coaching': return !!a.coachingStyle;
+    case 'startTiming': return !!a.startTiming;
+    default: return true; // identidad, físico (opcional) y molestias: habilitado, se valida al continuar
+  }
+}
 function renderQuizBody(){ $('#app').innerHTML=viewQuiz(); }
-let QUIZ_TIMER=null;
-function quizPick(key,val,auto){ if(QUIZ_TIMER){clearTimeout(QUIZ_TIMER);QUIZ_TIMER=null;} A()[key]=val; S.quiz._error=null; QuizService.touch(); renderQuizBody(); if(auto){ QUIZ_TIMER=setTimeout(()=>{QUIZ_TIMER=null;quizNext();},260); } }
-function quizPickMulti(key,val,max){ const a=A()[key]||[]; const i=a.indexOf(val); if(i>=0)a.splice(i,1); else{ if(a.length>=max){toast('Máximo '+max,'','info');return;} a.push(val);} A()[key]=a; QuizService.touch(); renderQuizBody(); }
-function quizSetBirth(v){ ID().birthDate=v; const a=ageFrom(v); S.quiz.consent.guardianRequired = a!=null&&a<18; S.quiz._error=null; QuizService.touch(); renderQuizBody(); }
+function quizPick(key,val){ A()[key]=val; S.quiz._error=null; QuizService.touch(); renderQuizBody(); }
+function quizPickMulti(key,val,max){ const a=A()[key]||[]; const i=a.indexOf(val); if(i>=0)a.splice(i,1); else{ if(a.length>=max){ return; } a.push(val);} A()[key]=a; QuizService.touch(); renderQuizBody(); }
+function quizSetBirth(v){ ID().birthDate=v; S.quiz._error=null; QuizService.touch(); renderQuizBody(); }
 function quizToggleDay(d){ const a=A().availableDays||[]; const i=a.indexOf(d); if(i>=0)a.splice(i,1); else a.push(d); A().availableDays=a; if(A().desiredSessions)A().desiredSessions=clamp(A().desiredSessions,1,Math.max(1,a.length||1)); QuizService.touch(); renderQuizBody(); }
 function quizSetSessions(n){ const max=Math.max(1,(A().availableDays||[]).length||1); A().desiredSessions=clamp(n,1,max); QuizService.touch(); renderQuizBody(); }
 function quizPhys(key,val){ A()[key]=+val; const id=key==='height'?'hVal':'wVal'; const el=document.getElementById(id); if(el){ const u=key==='height'?(A().heightUnit||'cm'):(A().weightUnit||'kg'); el.textContent = key==='height'?(u==='ft'?cmToFt(val):val+' cm'):(u==='lb'?Math.round(val*2.2046)+' lb':val+' kg'); } QuizService.touch(); }
 function quizSkipPhysical(){ A().height=null; A().weight=null; quizNext(); }
-function quizPain(z){ const a=A().painZones||[]; const i=a.indexOf(z); if(i>=0)a.splice(i,1); else a.push(z); A().painZones=a; QuizService.touch(); renderQuizBody(); }
 function quizNext(){ const step=curStep(); if(step.validate){ const v=step.validate(S.quiz); if(!v.ok){ S.quiz._error={stepId:step.id,msg:v.msg}; renderQuizBody(); if(v.focus){ const el=$(v.focus); if(el){el.classList.add('invalid');el.focus();} } return; } }
   S.quiz._error=null; const steps=quizSteps(); const ci=steps.findIndex(s=>s.id===step.id); const nxt=steps[ci+1];
   if(nxt){ S.quiz.navigationHistory.push(step.id); if(!S.quiz.visitedStepIds.includes(step.id))S.quiz.visitedStepIds.push(step.id); S.quiz.currentStepId=nxt.id; S.quiz.status='in-progress'; QuizService.touch(); renderQuizBody(); window.scrollTo(0,0); }
   else quizToProcessing(); }
-function quizBack(){ if(QUIZ_TIMER){clearTimeout(QUIZ_TIMER);QUIZ_TIMER=null;} const h=S.quiz.navigationHistory; if(h.length){ S.quiz.currentStepId=h.pop(); S.quiz._error=null; QuizService.touch(); renderQuizBody(); } else quizExit(); }
+function quizBack(){ const h=S.quiz.navigationHistory; if(h.length){ S.quiz.currentStepId=h.pop(); S.quiz._error=null; QuizService.touch(); renderQuizBody(); } else quizExit(); }
 function quizExit(){ QuizService.touch(); S.role='student-invited'; S.view='quizPaused'; saveState(); render(); }
 function quizPausedView(){ return `<div class="login-screen"><div class="login-card center" style="flex-direction:column;text-align:center">
   <div class="ni-ico txt-info" style="width:56px;height:56px;margin-bottom:14px">${icon('clipboard')}</div>
@@ -3306,11 +3314,13 @@ function quizToProcessing(){ S.quiz.stage='processing'; QuizService.touch(); ren
   set(); if(PROC_TIMER)clearInterval(PROC_TIMER); PROC_TIMER=setInterval(set,800);
   setTimeout(()=>{ clearInterval(PROC_TIMER); QuizService.complete(); S.quiz.stage='result'; QuizService.touch(); renderQuizBody(); },2600);
 }
-function quizProcessing(){ return `<div class="quiz-center"><div class="proc-ring">${ring(72,{size:120,label:'',color:'var(--brand)'})}</div>
-  <h2 style="margin:20px 0 6px" id="procMsg" aria-live="polite">Organizando tu objetivo</h2><p class="muted tiny">Un momento…</p></div>`; }
+function quizProcessing(){ return `<div class="quiz-processing"><div class="proc-ring">${ring(72,{size:120,label:'',color:'var(--brand)'})}</div>
+  <h2 id="procMsg" aria-live="polite">Organizando tu objetivo</h2><p class="muted tiny">Un momento…</p></div>`; }
 function quizResult(){ const a=A(),id=ID(); const t=DB.trainers.find(x=>x.id===S.quiz.trainerId)||curTrainer();
-  const phys = (a.height!=null?(a.heightUnit==='ft'?cmToFt(a.height):a.height+' cm'):'No proporcionado')+' · '+(a.weight!=null?(a.weightUnit==='lb'?Math.round(a.weight*2.2046)+' lb':a.weight+' kg'):'No proporcionado');
-  const rows=[['Objetivo principal',a.primaryGoal],['Qué quiere sentir',(a.desiredChange||[]).join(', ')],['Nivel',a.experienceLevel],['Disponibilidad seleccionada',(a.availableDays||[]).map(d=>DAYS_MAP_SHORT[d]).join(', ')+' · '+(a.desiredSessions||'—')+' sesiones'],['Duración',a.sessionDuration||'—'],['Lugar',a.primaryLocation||'—'],['Equipo',(a.equipment||[]).join(', ')||'—'],['Punto de partida físico',phys],['Zonas de atención',(a.painZones||[]).join(', ')||'Ninguna'],['Obstáculo principal',a.mainObstacle||'—'],['Preferencia de acompañamiento',a.coachingStyle||'—'],['Inicio deseado',a.startTiming||'—']];
+  const hDisp = a.height!=null?(a.heightUnit==='ft'?cmToFt(a.height):a.height+' cm'):'No proporcionado';
+  const wDisp = a.weight!=null?(a.weightUnit==='lb'?Math.round(a.weight*2.2046)+' lb':a.weight+' kg'):'No proporcionado';
+  const limit = a.hasLimitation==='Sí'?(a.limitationComment||'Tiene una limitación reportada'):'No reportada';
+  const rows=[['Objetivo principal',a.primaryGoal],['Objetivos secundarios',(a.secondaryGoals||[]).join(', ')],['Situación actual',a.experienceLevel],['Disponibilidad seleccionada',(a.availableDays||[]).map(d=>DAYS_MAP_SHORT[d]).join(', ')+' · '+(a.desiredSessions||'—')+' sesiones'],['Duración',a.sessionDuration||'—'],['Lugar',a.primaryLocation||'—'],['Equipo',(a.equipment||[]).join(', ')||'—'],['Altura',hDisp],['Peso',wDisp],['Molestia o limitación',limit],['Obstáculo principal',a.mainObstacle||'—'],['Estilo de acompañamiento',a.coachingStyle||'—'],['Inicio deseado',a.startTiming||'—']];
   return `<div class="view-enter">
     <div class="quiz-center" style="margin-bottom:8px">
       <div class="ni-ico txt-ok" style="width:60px;height:60px;margin:0 auto 12px">${icon('check')}</div>
@@ -3332,12 +3342,12 @@ function buildProfile(sess){ const a=sess.answers,id=sess.identity;
   return { firstName:id.firstName,lastName:id.lastName,name:((id.firstName||'')+' '+(id.lastName||'')).trim(),
     email:(id.email||'').toLowerCase(), phone: id.phoneNumber?((id.phoneCountryCode||'')+' '+id.phoneNumber):'',
     phoneCountryCode:id.phoneCountryCode||'', phoneNumber:id.phoneNumber||'', birthDate:id.birthDate||'',
-    goal:a.primaryGoal||'', goalsSec:a.desiredChange||[], experience:mapLevel(a.experienceLevel),
+    goal:a.primaryGoal||'', goalsSec:a.secondaryGoals||[], experience:mapLevel(a.experienceLevel),
     height:a.height, weight:a.weight, heightUnit:a.heightUnit||'cm', weightUnit:a.weightUnit||'kg',
     weightGoalDirection:a.weightGoalDirection||'', targetWeight:a.targetWeight!=null?a.targetWeight:null,
     days:(a.availableDays||[]).map(d=>DAYS_MAP_SHORT[d]||d), sessions:a.desiredSessions||null,
     places:a.primaryLocation?[a.primaryLocation]:[], equipment:a.equipment||[], duration:a.sessionDuration||'',
-    painZones:(a.painZones||[]), painType:a.painType||'', painIntensity:a.painIntensity||'', painComment:a.painComment||'',
+    hasLimitation:a.hasLimitation==='Sí', limitationComment:a.hasLimitation==='Sí'?(a.limitationComment||''):'',
     obstacle:a.mainObstacle||'', coaching:a.coachingStyle||'', startTiming:a.startTiming||'', desiredStartDate:a.desiredStartDate||null,
     trainPrefs:[], profileType:profileFor(a) };
 }
@@ -3354,7 +3364,6 @@ const QuizService={
   touch(){ if(S.quiz){ S.quiz.updatedAt=new Date().toISOString(); StorageService.save(); } },
   complete(){ const sess=S.quiz; if(sess.status==='completed'&&sess.studentId){ return DB.students.find(s=>s.id===sess.studentId); }
     const inv=InvitationService.find(sess.token); const prof=buildProfile(sess);
-    if(sess.consent){ sess.consent.acceptedAt=new Date().toISOString(); sess.consent.documentVersion=QUIZ_DOC_VERSION; }
     const student=StudentService.createProvisional(inv,sess,prof);
     sess.status='completed'; sess.completedAt=new Date().toISOString(); sess.studentId=student.id;
     InvitationService.complete(inv,student.id); StorageService.save(); return student; },
@@ -3362,8 +3371,8 @@ const QuizService={
 function freshQuizSession(inv){ return { id:uid('qs'), inviteId:inv.id, token:inv.token, trainerId:inv.trainer, status:'not-started',
   currentStepId:'welcome', visitedStepIds:[], navigationHistory:[], stage:null, startedAt:null, updatedAt:null, completedAt:null, studentId:null,
   identity:{firstName:inv.name||'',lastName:'',birthDate:'',email:inv.email||'',phoneCountryCode:'+57',phoneNumber:'',phoneFull:''},
-  answers:{primaryGoal:'',desiredChange:[],experienceLevel:'',currentWeeklyFrequency:null,availableDays:[],desiredSessions:null,sessionDuration:'',preferredTime:'',primaryLocation:'',equipment:[],equipment_single:'',height:null,heightUnit:'cm',weight:null,weightUnit:'kg',weightGoalDirection:'',targetWeight:null,hasPain:null,painType:'',painZones:[],painIntensity:'',painComment:'',mainObstacle:'',coachingStyle:'',startTiming:'',desiredStartDate:null,challengeType:''},
-  consent:{termsAccepted:false,privacyAccepted:false,essentialDataAccepted:false,shareWithTrainerAccepted:false,physicalDataAccepted:false,mediaAccepted:false,marketingAccepted:false,guardianRequired:false,acceptedAt:null,documentVersion:''},
+  answers:{primaryGoal:'',secondaryGoals:[],experienceLevel:'',currentWeeklyFrequency:null,availableDays:[],desiredSessions:null,sessionDuration:'',preferredTime:'',primaryLocation:'',equipment:[],equipment_single:'',height:null,heightUnit:'cm',weight:null,weightUnit:'kg',weightGoalDirection:'',targetWeight:null,hasLimitation:null,limitationComment:'',mainObstacle:'',coachingStyle:'',startTiming:'',desiredStartDate:null,challengeType:''},
+  consent:null,
   _error:null }; }
 function quizInvalidView(){ const k=S.invitedView; const map={notfound:['Este enlace no corresponde a una invitación válida.','search'],expired:['Esta invitación venció. Solicita una nueva a tu entrenador.','clock'],cancelled:['Esta invitación fue cancelada.','x'],completed:['Este registro ya fue completado.','check']};
   const m=map[k]||map.notfound; return `<div class="login-screen"><div class="login-card center" style="flex-direction:column;text-align:center">
@@ -3385,7 +3394,7 @@ function boot(){
   const goto=params.get('goto');
   if(goto){
     history.replaceState(null,'',location.pathname);
-    if(goto==='demo'||goto==='newuser'){ startDemoRegistration(); attachGlobal(); return; }
+    if(goto==='demo'||goto==='newuser'){ startNewDemoRegistration(); attachGlobal(); return; }
     if(['trainer','assistant','student'].includes(goto)){ demoLogin(goto); attachGlobal(); return; }
   }
   // Reanudar quiz en curso si el estado quedó en modo invitado
